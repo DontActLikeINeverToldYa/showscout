@@ -7,7 +7,7 @@ function buildRandomString(length) {
   return text
 }
 
-export async function handler() {
+export async function handler(event) {
   const clientId = process.env.SPOTIFY_CLIENT_ID
   const redirectUri = process.env.SPOTIFY_REDIRECT_URI
   const appBaseUrl = process.env.APP_BASE_URL
@@ -31,7 +31,8 @@ export async function handler() {
   authUrl.searchParams.set('scope', scope)
   authUrl.searchParams.set('redirect_uri', redirectUri)
   authUrl.searchParams.set('state', state)
-  authUrl.searchParams.set('show_dialog', 'false')
+  const force = event?.queryStringParameters?.force === '1'
+  authUrl.searchParams.set('show_dialog', force ? 'true' : 'false')
 
   const cookieParts = [
     `spotify_auth_state=${encodeURIComponent(state)}`,

@@ -118,6 +118,14 @@ export default function App() {
             {(playlistError || concertsError) && (
               <div className="mt-3 rounded-xl bg-red-950/40 px-3 py-2 text-sm text-red-200 ring-1 ring-red-900">
                 {playlistError || concertsError}
+                {(String(playlistError || '').includes('(403)') ||
+                  String(playlistError || '').toLowerCase().includes('connect spotify')) && (
+                  <div className="mt-2">
+                    <a href="/.netlify/functions/spotify-login?force=1" className="underline">
+                      Reconnect Spotify
+                    </a>
+                  </div>
+                )}
               </div>
             )}
 

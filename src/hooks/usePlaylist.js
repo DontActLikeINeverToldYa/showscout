@@ -20,6 +20,11 @@ export default function usePlaylist() {
         if (res.status === 401) {
           throw new Error('Connect Spotify to load playlist tracks.')
         }
+        if (res.status === 403) {
+          throw new Error(
+            'Spotify refused access to this playlist (403). Reconnect Spotify and make sure you have access to the playlist.',
+          )
+        }
         throw new Error(data?.error || 'Failed to load playlist.')
       }
 
