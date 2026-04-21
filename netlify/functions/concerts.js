@@ -57,7 +57,7 @@ function mapProduct(product) {
   }
 }
 
-import { logWithContext } from './_log.js'
+import { logWithContext, withRequestIdBody, withRequestIdHeaders } from './_log.js'
 
 export async function handler(event) {
   try {
@@ -67,7 +67,8 @@ export async function handler(event) {
     if (!artist || !city) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: 'Missing artist or city.' }),
+        headers: withRequestIdHeaders(event),
+        body: JSON.stringify(withRequestIdBody(event, { error: 'Missing artist or city.' })),
       }
     }
 
@@ -112,10 +113,11 @@ export async function handler(event) {
       })
       return {
         statusCode: 502,
-        body: JSON.stringify({
+        headers: withRequestIdHeaders(event),
+        body: JSON.stringify(withRequestIdBody(event, {
           error: `Eventim API error (${res.status}).`,
           eventim: data || null,
-        }),
+        })),
       }
     }
 
@@ -143,7 +145,8 @@ export async function handler(event) {
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ concerts }),
+      headers: withRequestIdHeaders(event),
+      body: JSON.stringify(withRequestIdBody(event, { concerts })),
     }
   } catch (e) {
     logWithContext({
@@ -152,6 +155,10 @@ export async function handler(event) {
       message: 'concerts.unhandled_error',
       meta: { error: e?.message || String(e) },
     })
-    return { statusCode: 500, body: JSON.stringify({ error: 'Unexpected error.' }) }
+    return {
+      statusCode: 500,
+      headers: withRequestIdHeaders(event),
+      body: JSON.stringify(withRequestIdBody(event, { error: 'Unexpected error.' })),
+    }
   }
 }

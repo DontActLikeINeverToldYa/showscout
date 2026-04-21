@@ -10,6 +10,8 @@ function parseCookies(cookieHeader) {
   return out
 }
 
+import { logWithContext, withRequestIdHeaders } from './_log.js'
+
 export async function handler(event) {
   try {
     const clientId = process.env.SPOTIFY_CLIENT_ID
@@ -20,6 +22,7 @@ export async function handler(event) {
     if (!clientId || !clientSecret || !redirectUri || !appBaseUrl) {
       return {
         statusCode: 500,
+        headers: withRequestIdHeaders(event),
         body: JSON.stringify({ error: 'Missing Spotify OAuth configuration.' }),
       }
     }
@@ -31,12 +34,24 @@ export async function handler(event) {
     const expectedState = cookies.spotify_auth_state
 
     if (!code) {
-      return { statusCode: 400, body: JSON.stringify({ error: 'Missing code.' }) }
+      logWithContext({ event, level: 'warn', message: 'spotify.callback.missing_code' })
+      return {
+        statusCode: 400,
+        headers: withRequestIdHeaders(event),
+        body: JSON.stringify({ error: 'Missing code.' }),
+      }
     }
 
     if (!state || !expectedState || state !== expectedState) {
-      return { statusCode: 400, body: JSON.stringify({ error: 'Invalid OAuth state.' }) }
+      logWithContext({ event, level: 'warn', message: 'spotify.callback.invalid_state' })
+      return {
+        statusCode: 400,
+        headers: withRequestIdHeaders(event),
+        body: JSON.stringify({ error: 'Invalid OAuth state.' }),
+      }
     }
+
+    logWithContext({ event, level: 'info', message: 'spotify.callback.exchange_start' })
 
     const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
 
@@ -56,11 +71,20 @@ export async function handler(event) {
     const data = await res.json().catch(() => ({}))
 
     if (!res.ok || !data.refresh_token) {
+      logWithContext({
+        event,
+        level: 'error',
+        message: 'spotify.callback.exchange_failed',
+        meta: { status: res.status, spotify: data?.error || data || null },
+      })
       return {
         statusCode: 400,
+        headers: withRequestIdHeaders(event),
         body: JSON.stringify({ error: 'Failed to complete Spotify login.', spotify: data }),
       }
     }
+
+    logWithContext({ event, level: 'info', message: 'spotify.callback.exchange_succeeded' })
 
     const refreshCookieParts = [
       `spotify_refresh_token=${encodeURIComponent(data.refresh_token)}`,
@@ -84,16 +108,21 @@ export async function handler(event) {
 
     return {
       statusCode: 302,
-      headers: {
+      headers: withRequestIdHeaders(event, {
         Location: redirect.toString(),
         'Cache-Control': 'no-store',
-      },
+      }),
       multiValueHeaders: {
         'Set-Cookie': [refreshCookie, clearStateCookie],
       },
       body: '',
     }
-  } catch {
-    return { statusCode: 500, body: JSON.stringify({ error: 'Unexpected error.' }) }
+  } catch (e) {
+    logWithContext({ event, level: 'error', message: 'spotify.callback.unhandled_error', meta: { error: e?.message || String(e) } })
+    return {
+      statusCode: 500,
+      headers: withRequestIdHeaders(event),
+      body: JSON.stringify({ error: 'Unexpected error.' }),
+    }
   }
 }

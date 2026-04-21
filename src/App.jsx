@@ -21,6 +21,7 @@ export default function App() {
   const {
     state: playlistState,
     error: playlistError,
+    requestId: playlistRequestId,
     playlist,
     artists,
     loadPlaylist,
@@ -31,9 +32,46 @@ export default function App() {
     progress,
     results,
     error: concertsError,
+    requestId: concertsRequestId,
     startSearch,
     reset: resetConcertSearch,
   } = useConcertSearch()
+
+  const debugInfo = useMemo(
+    () =>
+      JSON.stringify(
+        {
+          playlistId: playlistId || null,
+          city,
+          playlistState,
+          searchState,
+          playlistRequestId: playlistRequestId || null,
+          concertsRequestId: concertsRequestId || null,
+          playlistError: playlistError || null,
+          concertsError: concertsError || null,
+        },
+        null,
+        2,
+      ),
+    [
+      playlistId,
+      city,
+      playlistState,
+      searchState,
+      playlistRequestId,
+      concertsRequestId,
+      playlistError,
+      concertsError,
+    ],
+  )
+
+  const copyDebugInfo = async () => {
+    try {
+      await navigator.clipboard.writeText(debugInfo)
+    } catch {
+      // Ignore.
+    }
+  }
 
   useEffect(() => {
     setSearchParams({ playlist: playlistId || undefined, city })
@@ -126,6 +164,16 @@ export default function App() {
                     </a>
                   </div>
                 )}
+                {(playlistRequestId || concertsRequestId) && (
+                  <div className="mt-2 text-xs text-red-200/80">
+                    Request ID: {playlistRequestId || concertsRequestId}
+                  </div>
+                )}
+                <div className="mt-2">
+                  <button type="button" onClick={copyDebugInfo} className="underline">
+                    Copy debug info
+                  </button>
+                </div>
               </div>
             )}
 

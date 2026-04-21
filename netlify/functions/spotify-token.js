@@ -10,6 +10,8 @@ function parseCookies(cookieHeader) {
   return out
 }
 
+import { logWithContext, withRequestIdBody, withRequestIdHeaders } from './_log.js'
+
 export async function handler(event) {
   try {
     const clientId = process.env.SPOTIFY_CLIENT_ID
@@ -18,14 +20,20 @@ export async function handler(event) {
     if (!clientId || !clientSecret) {
       return {
         statusCode: 500,
-        body: JSON.stringify({ error: 'Missing Spotify credentials.' }),
+        headers: withRequestIdHeaders(event),
+        body: JSON.stringify(withRequestIdBody(event, { error: 'Missing Spotify credentials.' })),
       }
     }
 
     const cookies = parseCookies(event.headers?.cookie)
     const refreshToken = cookies.spotify_refresh_token
     if (!refreshToken) {
-      return { statusCode: 401, body: JSON.stringify({ error: 'Not connected to Spotify.' }) }
+      logWithContext({ event, level: 'warn', message: 'spotify.token.missing_refresh_token' })
+      return {
+        statusCode: 401,
+        headers: withRequestIdHeaders(event),
+        body: JSON.stringify(withRequestIdBody(event, { error: 'Not connected to Spotify.' })),
+      }
     }
 
     const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
@@ -44,17 +52,36 @@ export async function handler(event) {
 
     const data = await res.json().catch(() => ({}))
     if (!res.ok || !data.access_token) {
+      logWithContext({
+        event,
+        level: 'error',
+        message: 'spotify.token.refresh_failed',
+        meta: { status: res.status, spotify: data?.error || data || null },
+      })
       return {
         statusCode: 401,
-        body: JSON.stringify({ error: 'Failed to refresh Spotify session.', spotify: data?.error || data }),
+        headers: withRequestIdHeaders(event),
+        body: JSON.stringify(
+          withRequestIdBody(event, { error: 'Failed to refresh Spotify session.', spotify: data?.error || data }),
+        ),
       }
     }
 
+    logWithContext({ event, level: 'info', message: 'spotify.token.refreshed' })
+
     return {
       statusCode: 200,
-      body: JSON.stringify({ access_token: data.access_token, expires_in: data.expires_in }),
+      headers: withRequestIdHeaders(event),
+      body: JSON.stringify(
+        withRequestIdBody(event, { access_token: data.access_token, expires_in: data.expires_in }),
+      ),
     }
-  } catch {
-    return { statusCode: 500, body: JSON.stringify({ error: 'Unexpected error.' }) }
+  } catch (e) {
+    logWithContext({ event, level: 'error', message: 'spotify.token.unhandled_error', meta: { error: e?.message || String(e) } })
+    return {
+      statusCode: 500,
+      headers: withRequestIdHeaders(event),
+      body: JSON.stringify(withRequestIdBody(event, { error: 'Unexpected error.' })),
+    }
   }
 }

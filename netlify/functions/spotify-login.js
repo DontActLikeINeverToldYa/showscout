@@ -7,6 +7,8 @@ function buildRandomString(length) {
   return text
 }
 
+import { logWithContext, withRequestIdHeaders } from './_log.js'
+
 export async function handler(event) {
   const clientId = process.env.SPOTIFY_CLIENT_ID
   const redirectUri = process.env.SPOTIFY_REDIRECT_URI
@@ -15,6 +17,7 @@ export async function handler(event) {
   if (!clientId || !redirectUri || !appBaseUrl) {
     return {
       statusCode: 500,
+      headers: withRequestIdHeaders(event),
       body: JSON.stringify({ error: 'Missing Spotify OAuth configuration.' }),
     }
   }
@@ -34,6 +37,13 @@ export async function handler(event) {
   const force = event?.queryStringParameters?.force === '1'
   authUrl.searchParams.set('show_dialog', force ? 'true' : 'false')
 
+  logWithContext({
+    event,
+    level: 'info',
+    message: 'spotify.login.redirect',
+    meta: { force },
+  })
+
   const cookieParts = [
     `spotify_auth_state=${encodeURIComponent(state)}`,
     'HttpOnly',
@@ -45,11 +55,11 @@ export async function handler(event) {
 
   return {
     statusCode: 302,
-    headers: {
+    headers: withRequestIdHeaders(event, {
       Location: authUrl.toString(),
       'Set-Cookie': cookie,
       'Cache-Control': 'no-store',
-    },
+    }),
     body: '',
   }
 }

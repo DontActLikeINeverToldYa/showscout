@@ -12,6 +12,7 @@ export default function useConcertSearch() {
   const [error, setError] = useState(null)
   const [progress, setProgress] = useState({ current: 0, total: 0 })
   const [results, setResults] = useState([])
+  const [requestId, setRequestId] = useState(null)
 
   const cancelRef = useRef({ cancelled: false })
 
@@ -21,6 +22,7 @@ export default function useConcertSearch() {
     setError(null)
     setProgress({ current: 0, total: 0 })
     setResults([])
+    setRequestId(null)
   }, [])
 
   const startSearch = useCallback(async ({ artists, city }) => {
@@ -29,6 +31,7 @@ export default function useConcertSearch() {
     setResults([])
     setProgress({ current: 0, total: artists.length })
     setState('running')
+    setRequestId(null)
 
     const seen = new Set()
 
@@ -74,6 +77,11 @@ export default function useConcertSearch() {
           const qs = new URLSearchParams({ artist: artist.name, city })
           const res = await fetch(`/.netlify/functions/concerts?${qs.toString()}`)
           const data = await res.json().catch(() => ({}))
+
+          if (!requestId) {
+            setRequestId(data?.requestId || res.headers.get('x-request-id') || null)
+          }
+
           if (!res.ok) {
             if (!error) {
               setError(data?.error ? String(data.error) : `Concert lookup failed (${res.status}).`)
@@ -120,5 +128,5 @@ export default function useConcertSearch() {
     setState('idle')
   }, [])
 
-  return { state, error, progress, results, startSearch, reset, cancel }
+  return { state, error, requestId, progress, results, startSearch, reset, cancel }
 }

@@ -44,3 +44,15 @@ export function logWithContext({ event, level, message, meta }) {
   const fn = console?.[level] || console?.log
   fn(JSON.stringify(entry))
 }
+
+export function withRequestIdHeaders(event, headers = {}) {
+  const requestId = getRequestId(event)
+  if (!requestId) return headers
+  return { ...headers, 'x-request-id': String(requestId) }
+}
+
+export function withRequestIdBody(event, body = {}) {
+  const requestId = getRequestId(event)
+  if (!requestId) return body
+  return { ...body, requestId: String(requestId) }
+}

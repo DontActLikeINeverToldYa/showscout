@@ -10,7 +10,7 @@ function parseCookies(cookieHeader) {
   return out
 }
 
-import { logWithContext } from './_log.js'
+import { logWithContext, withRequestIdBody, withRequestIdHeaders } from './_log.js'
 
 async function getSpotifyAccessTokenFromRefreshToken(refreshToken) {
   const clientId = process.env.SPOTIFY_CLIENT_ID
@@ -67,7 +67,11 @@ export async function handler(event) {
     const playlistId = event.queryStringParameters?.playlistId
 
     if (!playlistId) {
-      return { statusCode: 400, body: JSON.stringify({ error: 'Missing playlistId.' }) }
+      return {
+        statusCode: 400,
+        headers: withRequestIdHeaders(event),
+        body: JSON.stringify(withRequestIdBody(event, { error: 'Missing playlistId.' })),
+      }
     }
 
     const cookies = parseCookies(event.headers?.cookie)
@@ -91,7 +95,8 @@ export async function handler(event) {
     if (pres.status === 404) {
       return {
         statusCode: 404,
-        body: JSON.stringify({ error: 'Playlist not found. Make sure it is public.' }),
+        headers: withRequestIdHeaders(event),
+        body: JSON.stringify(withRequestIdBody(event, { error: 'Playlist not found. Make sure it is public.' })),
       }
     }
 
@@ -106,12 +111,13 @@ export async function handler(event) {
       })
       return {
         statusCode: pres.status,
-        body: JSON.stringify({
+        headers: withRequestIdHeaders(event),
+        body: JSON.stringify(withRequestIdBody(event, {
           error: spotifyMessage
             ? `Spotify playlist error (${pres.status}): ${spotifyMessage}`
             : 'Failed to load playlist. Make sure it is public.',
           spotify: spotifyError || null,
-        }),
+        })),
       }
     }
 
@@ -150,7 +156,8 @@ export async function handler(event) {
       if (res.status === 404) {
         return {
           statusCode: 404,
-          body: JSON.stringify({ error: 'Playlist not found.' }),
+          headers: withRequestIdHeaders(event),
+          body: JSON.stringify(withRequestIdBody(event, { error: 'Playlist not found.' })),
         }
       }
 
@@ -167,12 +174,13 @@ export async function handler(event) {
 
         return {
           statusCode: res.status,
-          body: JSON.stringify({
+          headers: withRequestIdHeaders(event),
+          body: JSON.stringify(withRequestIdBody(event, {
             error: spotifyMessage
               ? `Spotify playlist tracks error (${res.status}): ${spotifyMessage}`
               : 'Failed to load playlist tracks.',
             spotify: spotifyError || data || null,
-          }),
+          })),
         }
       }
 
@@ -192,7 +200,8 @@ export async function handler(event) {
 
     return {
       statusCode: 200,
-      body: JSON.stringify({
+      headers: withRequestIdHeaders(event),
+      body: JSON.stringify(withRequestIdBody(event, {
         playlist: {
           id: playlistId,
           name: pdata?.name ?? 'Untitled playlist',
@@ -202,7 +211,7 @@ export async function handler(event) {
         },
         artists,
         debug: artists.length === 0 ? { sampleItem } : undefined,
-      }),
+      })),
     }
   } catch (e) {
     const statusCode = e?.statusCode || 500
@@ -216,7 +225,10 @@ export async function handler(event) {
 
     return {
       statusCode,
-      body: JSON.stringify({ error: e?.message || 'Unexpected error.', spotify: e?.spotify || null }),
+      headers: withRequestIdHeaders(event),
+      body: JSON.stringify(
+        withRequestIdBody(event, { error: e?.message || 'Unexpected error.', spotify: e?.spotify || null }),
+      ),
     }
   }
 }
