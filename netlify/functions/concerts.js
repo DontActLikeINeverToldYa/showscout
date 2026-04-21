@@ -57,6 +57,8 @@ function mapProduct(product) {
   }
 }
 
+import { logWithContext } from './_log.js'
+
 export async function handler(event) {
   try {
     const artist = event.queryStringParameters?.artist
@@ -68,6 +70,13 @@ export async function handler(event) {
         body: JSON.stringify({ error: 'Missing artist or city.' }),
       }
     }
+
+    logWithContext({
+      event,
+      level: 'info',
+      message: 'concerts.request',
+      meta: { artist, city },
+    })
 
     const base = 'https://public-api.eventim.com/websearch/search/api/exploration/v1/products'
     const params = new URLSearchParams({
@@ -95,6 +104,12 @@ export async function handler(event) {
     const data = await res.json().catch(() => ({}))
 
     if (!res.ok) {
+      logWithContext({
+        event,
+        level: 'error',
+        message: 'eventim.upstream_error',
+        meta: { status: res.status, artist, city, eventim: data || null },
+      })
       return {
         statusCode: 502,
         body: JSON.stringify({
@@ -130,7 +145,13 @@ export async function handler(event) {
       statusCode: 200,
       body: JSON.stringify({ concerts }),
     }
-  } catch {
+  } catch (e) {
+    logWithContext({
+      event,
+      level: 'error',
+      message: 'concerts.unhandled_error',
+      meta: { error: e?.message || String(e) },
+    })
     return { statusCode: 500, body: JSON.stringify({ error: 'Unexpected error.' }) }
   }
 }

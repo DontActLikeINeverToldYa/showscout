@@ -10,6 +10,8 @@ function parseCookies(cookieHeader) {
   return out
 }
 
+import { logWithContext } from './_log.js'
+
 async function getSpotifyAccessTokenFromRefreshToken(refreshToken) {
   const clientId = process.env.SPOTIFY_CLIENT_ID
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET
@@ -70,6 +72,14 @@ export async function handler(event) {
 
     const cookies = parseCookies(event.headers?.cookie)
     const refreshToken = cookies.spotify_refresh_token
+
+    logWithContext({
+      event,
+      level: 'info',
+      message: 'playlist.request',
+      meta: { playlistId, hasRefreshToken: Boolean(refreshToken) },
+    })
+
     const token = await getSpotifyAccessTokenFromRefreshToken(refreshToken)
 
     const playlistUrl = `https://api.spotify.com/v1/playlists/${encodeURIComponent(
@@ -88,9 +98,11 @@ export async function handler(event) {
     if (!pres.ok) {
       const spotifyError = pdata?.error
       const spotifyMessage = spotifyError?.message
-      console.error('Spotify playlist metadata error', {
-        status: pres.status,
-        error: spotifyError,
+      logWithContext({
+        event,
+        level: 'error',
+        message: 'spotify.playlist.metadata_error',
+        meta: { status: pres.status, spotify: spotifyError || null },
       })
       return {
         statusCode: pres.status,
@@ -145,6 +157,14 @@ export async function handler(event) {
       if (!res.ok) {
         const spotifyError = data?.error
         const spotifyMessage = spotifyError?.message
+
+        logWithContext({
+          event,
+          level: 'error',
+          message: 'spotify.playlist.items_error',
+          meta: { status: res.status, playlistId, offset, limit, spotify: spotifyError || data || null },
+        })
+
         return {
           statusCode: res.status,
           body: JSON.stringify({
@@ -186,6 +206,14 @@ export async function handler(event) {
     }
   } catch (e) {
     const statusCode = e?.statusCode || 500
+
+    logWithContext({
+      event,
+      level: 'error',
+      message: 'playlist.unhandled_error',
+      meta: { statusCode, error: e?.message || String(e), spotify: e?.spotify || null },
+    })
+
     return {
       statusCode,
       body: JSON.stringify({ error: e?.message || 'Unexpected error.', spotify: e?.spotify || null }),
