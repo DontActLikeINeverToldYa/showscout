@@ -18,7 +18,13 @@ export default function usePlaylist() {
       const res = await fetch(`/.netlify/functions/playlist?playlistId=${encodeURIComponent(playlistId)}`)
       const data = await res.json().catch(() => ({}))
 
-      setRequestId(data?.requestId || res.headers.get('x-request-id') || null)
+      setRequestId(
+        data?.requestId ||
+          res.headers.get('x-request-id') ||
+          res.headers.get('x-nf-request-id') ||
+          res.headers.get('x-correlation-id') ||
+          null,
+      )
 
       if (!res.ok) {
         if (res.status === 401) {
@@ -27,6 +33,11 @@ export default function usePlaylist() {
         if (res.status === 403) {
           throw new Error(
             'Spotify refused access to this playlist (403). Reconnect Spotify and make sure you have access to the playlist.',
+          )
+        }
+        if (String(data?.error || '').toLowerCase() === 'usage_exceeded') {
+          throw new Error(
+            'Service temporarily unavailable (usage exceeded). Please try again later or contact the app owner.',
           )
         }
         throw new Error(data?.error || 'Failed to load playlist.')

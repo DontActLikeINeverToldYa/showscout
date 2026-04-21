@@ -79,7 +79,13 @@ export default function useConcertSearch() {
           const data = await res.json().catch(() => ({}))
 
           if (!requestId) {
-            setRequestId(data?.requestId || res.headers.get('x-request-id') || null)
+            setRequestId(
+              data?.requestId ||
+                res.headers.get('x-request-id') ||
+                res.headers.get('x-nf-request-id') ||
+                res.headers.get('x-correlation-id') ||
+                null,
+            )
           }
 
           if (!res.ok) {
